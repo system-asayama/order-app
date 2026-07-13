@@ -245,6 +245,7 @@ def set_match_result(match_id: int, req: MatchResultInput, db: Session = Depends
             away_score=req.away_score,
             handicap=match.handicap,
             side=bet.side.value,
+            handicap_team=match.handicap_team or "team1",
         )
         payout = Decimal(str(bet.amount)) * multiplier
         bet.result = result

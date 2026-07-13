@@ -82,9 +82,10 @@ class Match(Base):
     home_team = Column(String(100), nullable=False)
     away_team = Column(String(100), nullable=False)
     match_date = Column(DateTime, nullable=False)
-    # ハンデ：正の値 = ホームチームに不利（例: 1.3 = ホームが1.3点のハンデを背負う）
-    # ベット時はhomeを選んだ場合、スコア差からhandicapを引いて判定
+    # ハンデ：正の値 = handicap_teamに不利（例: 1.3 = そのチームが1.3点のハンデを背負う）
+    # handicap_team: "team1"（ホーム）または "team2"（アウェイ）がハンデを背負う
     handicap = Column(Numeric(5, 2), default=0.00, nullable=False)
+    handicap_team = Column(String(10), default="team1", nullable=False)  # "team1" or "team2"
     home_score = Column(Integer, nullable=True)
     away_score = Column(Integer, nullable=True)
     status = Column(Enum(MatchStatus), default=MatchStatus.upcoming, nullable=False)

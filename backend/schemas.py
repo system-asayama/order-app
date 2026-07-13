@@ -68,6 +68,7 @@ class MatchCreate(BaseModel):
     away_team: str
     match_date: datetime
     handicap: Decimal = Decimal("0.00")
+    handicap_team: str = "team1"  # "team1" or "team2"
     notes: Optional[str] = None
 
 
@@ -76,6 +77,7 @@ class MatchUpdate(BaseModel):
     away_team: Optional[str] = None
     match_date: Optional[datetime] = None
     handicap: Optional[Decimal] = None
+    handicap_team: Optional[str] = None  # "team1" or "team2"
     status: Optional[MatchStatus] = None
     notes: Optional[str] = None
 
@@ -93,6 +95,7 @@ class MatchResponse(BaseModel):
     away_team: str
     match_date: datetime
     handicap: Decimal
+    handicap_team: str = "team1"
     home_score: Optional[int] = None
     away_score: Optional[int] = None
     status: MatchStatus

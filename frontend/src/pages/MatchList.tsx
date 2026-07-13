@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import UserLayout from '../components/UserLayout';
 import { useAuth } from '../hooks/useAuth';
 import { api, type Match, type Sport, type Bet, BET_RESULT_LABELS, BET_RESULT_COLORS, MATCH_STATUS_LABELS, MATCH_STATUS_COLORS } from '../lib/api';
@@ -10,12 +9,23 @@ interface BetModalProps {
   onSuccess: () => void;
 }
 
+// ハンデ付きチームのラベルを取得
+function getHandicapInfo(match: Match): { teamName: string; isHome: boolean } | null {
+  if (!match.handicap || Number(match.handicap) === 0) return null;
+  if (match.handicap_team === 'team2') {
+    return { teamName: match.away_team, isHome: false };
+  }
+  return { teamName: match.home_team, isHome: true };
+}
+
 function BetModal({ match, onClose, onSuccess }: BetModalProps) {
   const { user, refreshUser } = useAuth();
   const [side, setSide] = useState<'home' | 'away'>('home');
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const handicapInfo = getHandicapInfo(match);
 
   const handleBet = async () => {
     const amt = parseInt(amount);
@@ -54,24 +64,55 @@ function BetModal({ match, onClose, onSuccess }: BetModalProps) {
              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
           <p className="text-xs text-slate-500 mb-2">{match.sport?.name} · {new Date(match.match_date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
           <div className="flex items-center justify-center gap-4">
-            <span className="text-white font-bold text-lg">{match.home_team}</span>
-            <span className="text-slate-600">vs</span>
-            <span className="text-white font-bold text-lg">{match.away_team}</span>
+            <div className="text-center">
+              <span className="text-white font-bold text-lg">{match.home_team}</span>
+              {handicapInfo?.isHome && (
+                <div className="mt-0.5">
+                  <span className="text-xs px-1.5 py-0.5 rounded font-medium"
+                        style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}>
+                    -{match.handicap}
+                  </span>
+                </div>
+              )}
+            </div>
+            <span className="text-slate-600 font-bold">vs</span>
+            <div className="text-center">
+              <span className="text-white font-bold text-lg">{match.away_team}</span>
+              {handicapInfo && !handicapInfo.isHome && (
+                <div className="mt-0.5">
+                  <span className="text-xs px-1.5 py-0.5 rounded font-medium"
+                        style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}>
+                    -{match.handicap}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
-          <p className="text-xs mt-2" style={{ color: '#f0b429' }}>ハンデ: {match.handicap > 0 ? '+' : ''}{match.handicap}</p>
+          {handicapInfo && (
+            <p className="text-xs mt-2 text-slate-500">
+              <span style={{ color: '#f0b429' }}>{handicapInfo.teamName}</span> が -{match.handicap} のハンデを背負います
+            </p>
+          )}
         </div>
 
         {/* Side selection */}
         <div className="grid grid-cols-2 gap-3 mb-4">
-          {(['home', 'away'] as const).map(s => (
-            <button key={s} onClick={() => setSide(s)}
-                    className="py-3 rounded-xl font-semibold text-sm transition-all"
-                    style={side === s
-                      ? { background: 'rgba(240,180,41,0.15)', border: '2px solid #f0b429', color: '#f0b429' }
-                      : { background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)', color: '#94a3b8' }}>
-              {s === 'home' ? `🏠 ${match.home_team}` : `✈️ ${match.away_team}`}
-            </button>
-          ))}
+          {(['home', 'away'] as const).map(s => {
+            const isHandicapSide = (s === 'home' && handicapInfo?.isHome) || (s === 'away' && handicapInfo && !handicapInfo.isHome);
+            const teamName = s === 'home' ? match.home_team : match.away_team;
+            return (
+              <button key={s} onClick={() => setSide(s)}
+                      className="py-3 px-3 rounded-xl font-semibold text-sm transition-all"
+                      style={side === s
+                        ? { background: 'rgba(240,180,41,0.15)', border: '2px solid #f0b429', color: '#f0b429' }
+                        : { background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)', color: '#94a3b8' }}>
+                <span className="block">{s === 'home' ? '🏠' : '✈️'} {teamName}</span>
+                {isHandicapSide && (
+                  <span className="text-xs mt-0.5 block opacity-70">ハンデ -{match.handicap}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Amount */}
@@ -214,6 +255,7 @@ export default function MatchList() {
           <div className="space-y-3">
             {matches.map(match => {
               const myBet = myBetMap.get(match.id);
+              const handicapInfo = getHandicapInfo(match);
               return (
                 <div key={match.id} className="rounded-xl p-5 transition-all"
                      style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -235,6 +277,12 @@ export default function MatchList() {
                     <div className="flex-1 text-right">
                       <p className="text-lg font-bold text-white">{match.home_team}</p>
                       <p className="text-xs text-slate-500">ホーム</p>
+                      {handicapInfo?.isHome && (
+                        <span className="inline-block text-xs px-1.5 py-0.5 rounded mt-0.5 font-medium"
+                              style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}>
+                          -{match.handicap}
+                        </span>
+                      )}
                     </div>
                     <div className="px-6 text-center">
                       {match.status === 'finished' ? (
@@ -247,13 +295,18 @@ export default function MatchList() {
                       ) : (
                         <div>
                           <p className="text-slate-600 font-bold text-lg">vs</p>
-                          <p className="text-xs mt-1" style={{ color: '#f0b429' }}>ハンデ: {match.handicap}</p>
                         </div>
                       )}
                     </div>
                     <div className="flex-1">
                       <p className="text-lg font-bold text-white">{match.away_team}</p>
                       <p className="text-xs text-slate-500">アウェイ</p>
+                      {handicapInfo && !handicapInfo.isHome && (
+                        <span className="inline-block text-xs px-1.5 py-0.5 rounded mt-0.5 font-medium"
+                              style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}>
+                          -{match.handicap}
+                        </span>
+                      )}
                     </div>
                   </div>
 

@@ -2,11 +2,17 @@
 アジアンハンデ（Asian Handicap）判定ロジック
 
 【ルール】
-ハンデ（handicap）はホームチームが背負うハンデ点数。
+ハンデ（handicap）はhandicap_teamが背負うハンデ点数。
+handicap_team: "team1"（ホーム）または "team2"（アウェイ）
 
 【精算ルール】
-1. home側ベッターの実効スコア差 d = home_score - away_score - handicap
-   away側ベッターの実効スコア差 d = away_score - home_score + handicap
+1. ハンデを背負うチームの実効スコア差を計算する。
+   - handicap_team="team1"（ホーム）の場合:
+       home側ベッターの実効スコア差 d = home_score - away_score - handicap
+       away側ベッターの実効スコア差 d = away_score - home_score + handicap
+   - handicap_team="team2"（アウェイ）の場合:
+       home側ベッターの実効スコア差 d = home_score - away_score + handicap
+       away側ベッターの実効スコア差 d = away_score - home_score - handicap
 
 2. 判定:
    - d > 0  → 勝ち（×1.9倍）
@@ -17,17 +23,6 @@
    小数部分 frac がそのまま没収/獲得の割合になる。
    - 負け側: frac分没収、(1-frac)分返還  → 「X歩負け」（X = frac×10）
    - 勝ち側: frac分は1.9倍、(1-frac)分は返還 → 「X歩勝ち」
-
-【具体例（ユーザー確認済み）】
-ハンデ1.1、スコア1-0（1点差）:
-  home: d = 1 - 1.1 = -0.1 → |d|=frac=0.1 → 10%没収（1歩負け）
-  away: d = -1 + 1.1 = 0.1 → d=frac=0.1 → 10%は1.9倍（1歩勝ち）
-
-ハンデ1.7、スコア1-0（1点差）:
-  home: d = 1 - 1.7 = -0.7 → |d|=frac=0.7 → 70%没収（7歩負け）
-
-ハンデ1.3、スコア1-0（1点差）:
-  home: d = 1 - 1.3 = -0.3 → |d|=frac=0.3 → 30%没収（3歩負け）
 """
 
 from decimal import Decimal, ROUND_HALF_UP
@@ -41,13 +36,17 @@ def calculate_result_v2(
     home_score: int,
     away_score: int,
     handicap: float,
-    side: str  # "home" or "away"
+    side: str,  # "home" or "away"
+    handicap_team: str = "team1"  # "team1"（ホーム）or "team2"（アウェイ）がハンデを背負う
 ) -> tuple[BetResult, Decimal]:
     """
     アジアンハンデ判定。
 
     小数部分がそのまま部分精算の割合になる。
     例: ハンデ1.3で1点差 → 30%没収（3歩負け）
+
+    handicap_team: "team1" の場合ホームがハンデを背負う（従来動作）
+                   "team2" の場合アウェイがハンデを背負う（逆転）
 
     Returns:
         (BetResult, payout_multiplier)
@@ -56,10 +55,20 @@ def calculate_result_v2(
     h = Decimal(str(handicap))
     score_diff = Decimal(str(home_score - away_score))
 
-    if side == "home":
-        d = score_diff - h
+    # handicap_team="team1"（ホームがハンデ）: ホームの実効スコア差 = score_diff - h
+    # handicap_team="team2"（アウェイがハンデ）: ホームの実効スコア差 = score_diff + h
+    if handicap_team == "team1":
+        # ホームがハンデを背負う（従来ロジック）
+        if side == "home":
+            d = score_diff - h
+        else:
+            d = -score_diff + h
     else:
-        d = -score_diff + h
+        # アウェイがハンデを背負う（逆転）
+        if side == "home":
+            d = score_diff + h
+        else:
+            d = -score_diff - h
 
     # ハンデの小数部分（0.0〜0.99...）
     frac = h % Decimal("1")

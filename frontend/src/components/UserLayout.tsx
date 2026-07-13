@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
@@ -8,57 +9,113 @@ const navItems = [
   { to: '/ranking', icon: '🏆', label: 'ランキング' },
 ];
 
+const SIDEBAR_BG = '#111827';
+const BORDER = '1px solid rgba(255,255,255,0.06)';
+const GOLD = '#f0b429';
+
 export default function UserLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  return (
-    <div className="flex min-h-screen" style={{ background: '#0a0e1a' }}>
-      <aside className="w-60 flex-shrink-0 flex flex-col"
-             style={{ background: '#111827', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="px-5 py-6 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-          <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm"
-                 style={{ background: 'linear-gradient(135deg, #f0b429, #d97706)' }}>⚽</div>
-            <span className="font-bold text-sm tracking-wider"
-                  style={{ fontFamily: 'Rajdhani, sans-serif', color: '#f0b429' }}>
-              SPORT BET SIM
-            </span>
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+
+  const SidebarInner = ({ onNav }: { onNav?: () => void }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Logo */}
+      <div style={{ padding: '20px', borderBottom: BORDER }}>
+        <button onClick={() => { navigate('/dashboard'); onNav?.(); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer' }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg,#f0b429,#d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>⚽</div>
+          <span style={{ fontFamily: 'Rajdhani, sans-serif', color: GOLD, fontWeight: 700, fontSize: 14, letterSpacing: 2 }}>SPORT BET SIM</span>
+        </button>
+      </div>
+
+      {/* Nav */}
+      <nav style={{ flex: 1, padding: '16px 12px' }}>
+        {navItems.map(item => (
+          <NavLink key={item.to} to={item.to} onClick={onNav}
+            className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            <span style={{ fontSize: 16 }}>{item.icon}</span>
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* Footer */}
+      <div style={{ padding: '12px', borderTop: BORDER }}>
+        <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(240,180,41,0.08)', border: '1px solid rgba(240,180,41,0.15)', marginBottom: 8 }}>
+          <p style={{ fontSize: 11, color: '#64748b', margin: '0 0 2px' }}>保有ポイント</p>
+          <p style={{ fontSize: 20, fontWeight: 700, color: GOLD, fontFamily: 'Rajdhani, sans-serif', margin: 0 }}>
+            {user?.balance?.toLocaleString() ?? '-'} <span style={{ fontSize: 13, fontWeight: 400 }}>pt</span>
+          </p>
+        </div>
+        <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontSize: 12, fontWeight: 500, color: '#cbd5e1', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name}</p>
+            <p style={{ fontSize: 11, color: '#475569', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</p>
+          </div>
+          <button onClick={logout} style={{ fontSize: 12, color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', marginLeft: 8, flexShrink: 0 }}>
+            ログアウト
           </button>
         </div>
+      </div>
+    </div>
+  );
 
-        <nav className="flex-1 px-3 py-4 space-y-0.5">
-          {navItems.map(item => (
-            <NavLink key={item.to} to={item.to}
-              className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-              <span className="text-base">{item.icon}</span>
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
-        </nav>
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#0a0e1a' }}>
+      {/* Desktop sidebar */}
+      {!isMobile && (
+        <aside style={{ width: 240, flexShrink: 0, background: SIDEBAR_BG, borderRight: BORDER }}>
+          <SidebarInner />
+        </aside>
+      )}
 
-        <div className="px-3 pb-4 border-t pt-3" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-          <div className="px-3 py-2.5 rounded-lg mb-2" style={{ background: 'rgba(240,180,41,0.08)', border: '1px solid rgba(240,180,41,0.15)' }}>
-            <p className="text-xs text-slate-500 mb-0.5">保有ポイント</p>
-            <p className="text-xl font-bold" style={{ color: '#f0b429', fontFamily: 'Rajdhani, sans-serif' }}>
-              {user?.balance?.toLocaleString() ?? '-'} <span className="text-sm font-normal">pt</span>
-            </p>
-          </div>
-          <div className="px-3 py-2 rounded-lg flex items-center justify-between"
-               style={{ background: 'rgba(255,255,255,0.03)' }}>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-slate-300 truncate">{user?.name}</p>
-              <p className="text-xs text-slate-600 truncate">{user?.email}</p>
-            </div>
-            <button onClick={logout}
-                    className="text-xs text-slate-500 hover:text-red-400 transition-colors px-2 py-1 rounded ml-2 flex-shrink-0">
-              ログアウト
+      {/* Mobile overlay */}
+      {isMobile && drawerOpen && (
+        <div onClick={() => setDrawerOpen(false)}
+             style={{ position: 'fixed', inset: 0, zIndex: 40, background: 'rgba(0,0,0,0.65)' }} />
+      )}
+
+      {/* Mobile drawer */}
+      {isMobile && (
+        <aside style={{
+          position: 'fixed', top: 0, left: 0, height: '100%', zIndex: 50,
+          width: 260, background: SIDEBAR_BG, borderRight: BORDER,
+          transform: drawerOpen ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform 0.28s cubic-bezier(0.23,1,0.32,1)',
+        }}>
+          <button onClick={() => setDrawerOpen(false)}
+                  style={{ position: 'absolute', top: 14, right: 14, background: 'none', border: 'none', color: '#94a3b8', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+          <SidebarInner onNav={() => setDrawerOpen(false)} />
+        </aside>
+      )}
+
+      {/* Main */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {/* Mobile top bar */}
+        {isMobile && (
+          <header style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: SIDEBAR_BG, borderBottom: BORDER, flexShrink: 0 }}>
+            <button onClick={() => setDrawerOpen(true)}
+                    style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: 6, background: 'none', border: 'none', cursor: 'pointer' }}>
+              <span style={{ display: 'block', width: 20, height: 2, background: GOLD, borderRadius: 1 }} />
+              <span style={{ display: 'block', width: 20, height: 2, background: GOLD, borderRadius: 1 }} />
+              <span style={{ display: 'block', width: 20, height: 2, background: GOLD, borderRadius: 1 }} />
             </button>
-          </div>
-        </div>
-      </aside>
-
-      <main className="flex-1 overflow-auto">{children}</main>
+            <span style={{ fontFamily: 'Rajdhani, sans-serif', color: GOLD, fontWeight: 700, fontSize: 14, letterSpacing: 2 }}>SPORT BET SIM</span>
+            <div style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 700, color: GOLD, fontFamily: 'Rajdhani, sans-serif' }}>
+              {user?.balance?.toLocaleString() ?? '-'} pt
+            </div>
+          </header>
+        )}
+        <main style={{ flex: 1, overflow: 'auto' }}>{children}</main>
+      </div>
     </div>
   );
 }

@@ -8,6 +8,7 @@ interface MatchFormData {
   sport_id: string;
   match_date: string;
   handicap: string;
+  handicap_team: string;  // "team1" or "team2"
   description: string;
 }
 
@@ -17,7 +18,7 @@ interface ResultFormData {
 }
 
 const emptyForm: MatchFormData = {
-  home_team: '', away_team: '', sport_id: '', match_date: '', handicap: '0', description: ''
+  home_team: '', away_team: '', sport_id: '', match_date: '', handicap: '0', handicap_team: 'team1', description: ''
 };
 
 export default function AdminMatches() {
@@ -67,6 +68,7 @@ export default function AdminMatches() {
       sport_id: String(m.sport_id),
       match_date: local,
       handicap: String(m.handicap),
+      handicap_team: m.handicap_team || 'team1',
       description: m.notes ?? '',
     });
     setError('');
@@ -87,6 +89,7 @@ export default function AdminMatches() {
         sport_id: form.sport_id ? parseInt(form.sport_id) : null,
         match_date: new Date(form.match_date).toISOString(),
         handicap: parseFloat(form.handicap) || 0,
+        handicap_team: form.handicap_team,
         notes: form.description || null,
       };
       if (editMatch) {
@@ -136,6 +139,13 @@ export default function AdminMatches() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // ハンデ付きチームのラベルを返す
+  const getHandicapLabel = (match: Match) => {
+    if (!match.handicap || Number(match.handicap) === 0) return null;
+    const teamName = match.handicap_team === 'team2' ? match.away_team : match.home_team;
+    return `${teamName} -${match.handicap}`;
   };
 
   return (
@@ -194,7 +204,14 @@ export default function AdminMatches() {
                         <span className="text-xs text-slate-500">
                           {new Date(match.match_date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </span>
-                        <span className="text-xs" style={{ color: '#f0b429' }}>ハンデ: {match.handicap}</span>
+                        {getHandicapLabel(match) ? (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded"
+                                style={{ background: 'rgba(240,180,41,0.15)', color: '#f0b429', border: '1px solid rgba(240,180,41,0.3)' }}>
+                            ハンデ: {getHandicapLabel(match)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-600">ハンデなし</span>
+                        )}
                         {match.status === 'finished' && match.home_score != null && (
                           <span className="text-xs text-emerald-400 font-semibold">
                             {match.home_score} - {match.away_score}
@@ -261,12 +278,12 @@ export default function AdminMatches() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">ホームチーム *</label>
+                  <label className="block text-xs text-slate-400 mb-1.5">チームA（ホーム）*</label>
                   <input value={form.home_team} onChange={e => setForm(f => ({ ...f, home_team: e.target.value }))}
                          placeholder="例: 浦和レッズ" className="input-dark" />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">アウェイチーム *</label>
+                  <label className="block text-xs text-slate-400 mb-1.5">チームB（アウェイ）*</label>
                   <input value={form.away_team} onChange={e => setForm(f => ({ ...f, away_team: e.target.value }))}
                          placeholder="例: 鹿島アントラーズ" className="input-dark" />
                 </div>
@@ -282,11 +299,41 @@ export default function AdminMatches() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">ハンデ</label>
+                  <label className="block text-xs text-slate-400 mb-1.5">ハンデ点数</label>
                   <input type="number" step="0.25" value={form.handicap}
                          onChange={e => setForm(f => ({ ...f, handicap: e.target.value }))}
                          placeholder="例: 1.25" className="input-dark" />
                 </div>
+              </div>
+
+              {/* ハンデ付きチーム選択 */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1.5">ハンデが付くチーム</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, handicap_team: 'team1' }))}
+                    className="py-2.5 px-3 rounded-lg text-sm font-medium transition-all text-left"
+                    style={form.handicap_team === 'team1'
+                      ? { background: 'rgba(240,180,41,0.2)', color: '#f0b429', border: '1px solid rgba(240,180,41,0.5)' }
+                      : { background: 'rgba(255,255,255,0.04)', color: '#64748b', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <span className="block text-xs mb-0.5 opacity-70">チームA（ホーム）</span>
+                    <span>{form.home_team || 'チームA'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, handicap_team: 'team2' }))}
+                    className="py-2.5 px-3 rounded-lg text-sm font-medium transition-all text-left"
+                    style={form.handicap_team === 'team2'
+                      ? { background: 'rgba(240,180,41,0.2)', color: '#f0b429', border: '1px solid rgba(240,180,41,0.5)' }
+                      : { background: 'rgba(255,255,255,0.04)', color: '#64748b', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <span className="block text-xs mb-0.5 opacity-70">チームB（アウェイ）</span>
+                    <span>{form.away_team || 'チームB'}</span>
+                  </button>
+                </div>
+                <p className="text-xs text-slate-600 mt-1.5">
+                  選択したチームが -{form.handicap || '0'} のハンデを背負います
+                </p>
               </div>
 
               <div>
@@ -330,7 +377,7 @@ export default function AdminMatches() {
              style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}>
           <div className="w-full max-w-md rounded-2xl p-6 animate-fade-in"
                style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-white">結果を入力</h3>
               <button onClick={() => setResultModal(null)} className="text-slate-500 hover:text-white text-xl">×</button>
             </div>
@@ -338,7 +385,11 @@ export default function AdminMatches() {
             <div className="text-center mb-5 p-4 rounded-xl"
                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
               <p className="text-white font-semibold">{resultModal.home_team} vs {resultModal.away_team}</p>
-              <p className="text-xs text-slate-500 mt-1">ハンデ: {resultModal.handicap}</p>
+              {Number(resultModal.handicap) > 0 && (
+                <p className="text-xs mt-1" style={{ color: '#f0b429' }}>
+                  ハンデ: {resultModal.handicap_team === 'team2' ? resultModal.away_team : resultModal.home_team} -{resultModal.handicap}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-4">

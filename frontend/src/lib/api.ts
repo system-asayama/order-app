@@ -52,6 +52,7 @@ export interface Match {
   away_team: string;
   match_date: string;
   handicap: number;
+  handicap_team: string;  // "team1" or "team2"
   home_score?: number;
   away_score?: number;
   status: MatchStatus;
