@@ -1,31 +1,69 @@
-import { useState, useEffect, useCallback } from 'react'
-import { getMe, type User } from '../lib/api'
+import { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import { api, type User } from '../lib/api';
 
-interface AuthState {
-  user: User | null
-  loading: boolean
-  isAuthenticated: boolean
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+  refreshUser: () => Promise<void>;
 }
 
-export function useAuth(): AuthState & { refetch: () => void } {
-  const [state, setState] = useState<AuthState>({ user: null, loading: true, isAuthenticated: false })
+export const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: true,
+  isAuthenticated: false,
+  login: async () => {},
+  logout: () => {},
+  refreshUser: async () => {},
+});
 
-  const fetch = useCallback(async () => {
-    const token = localStorage.getItem('token')
+export function useAuth() {
+  return useContext(AuthContext);
+}
+
+export function useAuthProvider(): AuthContextType {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchUser = useCallback(async () => {
+    const token = localStorage.getItem('token');
     if (!token) {
-      setState({ user: null, loading: false, isAuthenticated: false })
-      return
+      setLoading(false);
+      return;
     }
     try {
-      const { data } = await getMe()
-      setState({ user: data, loading: false, isAuthenticated: true })
+      const res = await api.get<User>('/auth/me');
+      setUser(res.data);
     } catch {
-      localStorage.removeItem('token')
-      setState({ user: null, loading: false, isAuthenticated: false })
+      localStorage.removeItem('token');
+      setUser(null);
+    } finally {
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
-  useEffect(() => { fetch() }, [fetch])
+  useEffect(() => { fetchUser(); }, [fetchUser]);
 
-  return { ...state, refetch: fetch }
+  const login = async (email: string, password: string) => {
+    const res = await api.post<{ access_token: string }>('/auth/login', { email, password });
+    localStorage.setItem('token', res.data.access_token);
+    await fetchUser();
+  };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+    window.location.href = '/login';
+  };
+
+  return {
+    user,
+    loading,
+    isAuthenticated: !!user,
+    login,
+    logout,
+    refreshUser: fetchUser,
+  };
 }

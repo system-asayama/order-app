@@ -1,13 +1,21 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
-import './index.css'
-import App from './App'
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import './index.css';
+import App from './App';
+import { AuthContext, useAuthProvider } from './hooks/useAuth';
+
+function AuthProvider({ children }: { children: React.ReactNode }) {
+  const auth = useAuthProvider();
+  return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>;
+}
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
+  <React.StrictMode>
     <BrowserRouter>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </BrowserRouter>
-  </StrictMode>,
-)
+  </React.StrictMode>
+);

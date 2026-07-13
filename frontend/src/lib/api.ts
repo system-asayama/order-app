@@ -1,98 +1,137 @@
-import axios from 'axios'
+import axios from 'axios';
 
 export const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
-})
+});
 
-// Attach JWT token to every request
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
+  const token = localStorage.getItem('token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
 
-// Redirect to login on 401
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      localStorage.removeItem('token')
-      window.location.href = '/login'
+      localStorage.removeItem('token');
+      window.location.href = '/login';
     }
-    return Promise.reject(err)
+    return Promise.reject(err);
   }
-)
+);
 
-// ---- Types ----
+export default api;
 
-export type Role = 'admin' | 'user'
-export type OrderStatus = 'pending' | 'approved' | 'rejected'
-
+// ===== Types =====
 export interface User {
-  id: number
-  email: string
-  name: string
-  role: Role
-  is_active: boolean
-  created_at: string
+  id: number;
+  email: string;
+  name: string;
+  role: 'admin' | 'user';
+  balance: number;
+  is_active: boolean;
+  created_at: string;
 }
 
-export interface OrderItem {
-  id: number
-  name: string
-  description: string | null
-  default_amount: number | null
-  category: string | null
-  is_active: boolean
-  created_at: string
-  updated_at: string
+export interface Sport {
+  id: number;
+  name: string;
+  icon: string;
+  is_active: boolean;
 }
 
-export interface Order {
-  id: number
-  user_id: number
-  order_item_id: number | null
-  item_name: string
-  amount: number
-  memo: string | null
-  status: OrderStatus
-  created_at: string
-  updated_at: string
-  user_name?: string
-  user_email?: string
+export type MatchStatus = 'upcoming' | 'closed' | 'finished' | 'cancelled';
+
+export interface Match {
+  id: number;
+  sport_id: number;
+  sport?: Sport;
+  home_team: string;
+  away_team: string;
+  match_date: string;
+  handicap: number;
+  home_score?: number;
+  away_score?: number;
+  status: MatchStatus;
+  notes?: string;
+  created_at: string;
 }
 
-// ---- Auth ----
+export type BetSide = 'home' | 'away';
+export type BetResult =
+  | 'win' | 'partial_win_75' | 'partial_win_50'
+  | 'push'
+  | 'partial_loss_50' | 'partial_loss_75' | 'loss'
+  | 'pending' | 'cancelled';
 
-export const login = (email: string, password: string) =>
-  api.post<{ access_token: string; token_type: string }>('/auth/login', { email, password })
+export interface Bet {
+  id: number;
+  user_id: number;
+  match_id: number;
+  match?: Match;
+  side: BetSide;
+  amount: number;
+  result: BetResult;
+  payout?: number;
+  created_at: string;
+  settled_at?: string;
+}
 
-export const getMe = () => api.get<User>('/auth/me')
+export interface PointTransaction {
+  id: number;
+  amount: number;
+  balance_after: number;
+  transaction_type: string;
+  description?: string;
+  created_at: string;
+}
 
-// ---- Users ----
+export interface RankingEntry {
+  rank: number;
+  user_id: number;
+  name: string;
+  balance: number;
+  total_bets: number;
+  wins: number;
+  win_rate: number;
+}
 
-export const listUsers = () => api.get<User[]>('/users')
-export const createUser = (data: { email: string; name: string; password: string; role: Role }) =>
-  api.post<User>('/users', data)
-export const updateUser = (id: number, data: Partial<{ name: string; role: Role; is_active: boolean }>) =>
-  api.patch<User>(`/users/${id}`, data)
+export const BET_RESULT_LABELS: Record<BetResult, string> = {
+  win: '勝ち',
+  partial_win_75: '3分勝ち',
+  partial_win_50: '歩勝ち',
+  push: '引き分け（返還）',
+  partial_loss_50: '歩負け',
+  partial_loss_75: '3分負け',
+  loss: '負け',
+  pending: '未確定',
+  cancelled: 'キャンセル',
+};
 
-// ---- Order Items ----
+export const BET_RESULT_COLORS: Record<BetResult, string> = {
+  win: 'text-emerald-400',
+  partial_win_75: 'text-emerald-300',
+  partial_win_50: 'text-teal-300',
+  push: 'text-slate-400',
+  partial_loss_50: 'text-amber-300',
+  partial_loss_75: 'text-orange-400',
+  loss: 'text-red-400',
+  pending: 'text-slate-400',
+  cancelled: 'text-slate-500',
+};
 
-export const listOrderItems = (activeOnly = true) =>
-  api.get<OrderItem[]>('/order-items', { params: { active_only: activeOnly } })
-export const createOrderItem = (data: { name: string; description?: string; default_amount?: number; category?: string }) =>
-  api.post<OrderItem>('/order-items', data)
-export const updateOrderItem = (id: number, data: Partial<OrderItem>) =>
-  api.patch<OrderItem>(`/order-items/${id}`, data)
-export const deleteOrderItem = (id: number) => api.delete(`/order-items/${id}`)
+export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
+  upcoming: 'ベット受付中',
+  closed: '締め切り',
+  finished: '精算済み',
+  cancelled: '中止',
+};
 
-// ---- Orders ----
-
-export const createOrder = (data: { order_item_id?: number; item_name: string; amount: number; memo?: string }) =>
-  api.post<Order>('/orders', data)
-export const myOrders = () => api.get<Order[]>('/orders/my')
-export const allOrders = () => api.get<Order[]>('/orders')
-export const updateOrderStatus = (id: number, status: OrderStatus) =>
-  api.patch<Order>(`/orders/${id}/status`, { status })
+export const MATCH_STATUS_COLORS: Record<MatchStatus, string> = {
+  upcoming: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+  closed: 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
+  finished: 'bg-slate-500/20 text-slate-300 border border-slate-500/30',
+  cancelled: 'bg-red-500/20 text-red-300 border border-red-500/30',
+};

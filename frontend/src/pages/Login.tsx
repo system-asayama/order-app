@@ -1,142 +1,99 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { login, getMe } from '../lib/api'
-import { Eye, EyeOff, Lock, Mail } from 'lucide-react'
+import { useState, useEffect, FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Login() {
-  const navigate = useNavigate()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPw, setShowPw] = useState(false)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const { login, user } = useAuth();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // Redirect if already logged in
   useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (!token) return
-    getMe().then(({ data }) => {
-      navigate(data.role === 'admin' ? '/admin' : '/dashboard', { replace: true })
-    }).catch(() => localStorage.removeItem('token'))
-  }, [navigate])
+    if (user) navigate(user.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
+  }, [user, navigate]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
     try {
-      const { data } = await login(email, password)
-      localStorage.setItem('token', data.access_token)
-      const { data: me } = await getMe()
-      navigate(me.role === 'admin' ? '/admin' : '/dashboard', { replace: true })
+      await login(email, password);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setError(msg || 'ログインに失敗しました')
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(msg || 'メールアドレスまたはパスワードが正しくありません');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left panel */}
-      <div className="hidden lg:flex w-1/2 bg-[#0f1a33] flex-col justify-between p-12">
-        <div>
-          <h1 className="font-serif text-3xl text-[#c9a227] tracking-widest uppercase">Order App</h1>
-          <p className="text-white/40 text-xs mt-1 font-sans tracking-wider">Management System</p>
-        </div>
-        <div>
-          <div className="w-12 h-px bg-[#c9a227] mb-6" />
-          <h2 className="font-serif text-4xl text-white leading-tight mb-4">
-            Welcome<br />
-            <span className="text-[#c9a227]">Back</span>
-          </h2>
-          <p className="text-white/50 text-sm font-sans leading-relaxed max-w-xs">
-            ロールベースのアクセス制御と品目マスター管理を備えた注文管理システムです。
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { label: 'Administrator', desc: 'Full system access & management' },
-            { label: 'User', desc: 'Personal orders & profile' },
-          ].map((r) => (
-            <div key={r.label} className="border border-white/10 rounded-lg p-3">
-              <p className="text-xs font-medium text-white/80 font-sans">{r.label}</p>
-              <p className="text-xs text-white/40 mt-0.5 font-sans">{r.desc}</p>
-            </div>
-          ))}
-        </div>
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden"
+         style={{ background: 'linear-gradient(135deg, #0a0e1a 0%, #0d1526 50%, #0a0e1a 100%)' }}>
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full opacity-5"
+             style={{ background: 'radial-gradient(circle, #f0b429, transparent)', filter: 'blur(60px)' }} />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 rounded-full opacity-5"
+             style={{ background: 'radial-gradient(circle, #10b981, transparent)', filter: 'blur(60px)' }} />
       </div>
 
-      {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-[#faf8f3]">
-        <div className="w-full max-w-sm">
-          <div className="mb-8">
-            <h2 className="font-serif text-3xl text-[#0f1a33] mb-1">Sign In</h2>
-            <p className="text-sm text-gray-500 font-sans">アカウント情報を入力してください</p>
+      <div className="w-full max-w-md px-6 animate-fade-in">
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
+               style={{ background: 'linear-gradient(135deg, #f0b429, #d97706)', boxShadow: '0 0 30px rgba(240,180,41,0.3)' }}>
+            <span className="text-2xl">⚽</span>
           </div>
+          <h1 className="text-3xl font-bold mb-1"
+              style={{ fontFamily: 'Rajdhani, sans-serif', color: '#f0b429', letterSpacing: '0.05em' }}>
+            SPORT BET SIM
+          </h1>
+          <p className="text-slate-500 text-sm">スポーツベッティングシミュレーター</p>
+        </div>
+
+        <div className="rounded-2xl p-8"
+             style={{ background: 'rgba(17,24,39,0.9)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(20px)' }}>
+          <h2 className="text-xl font-semibold text-white mb-6">ログイン</h2>
+
+          {error && (
+            <div className="mb-4 px-4 py-3 rounded-lg text-sm text-red-300"
+                 style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email */}
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5 font-sans">メールアドレス</label>
-              <div className="relative">
-                <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="admin@example.com"
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#c9a227] focus:ring-2 focus:ring-[#c9a227]/20 transition-all"
-                />
-              </div>
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">メールアドレス</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                     required placeholder="your@email.com" className="input-dark" />
             </div>
-
-            {/* Password */}
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5 font-sans">パスワード</label>
-              <div className="relative">
-                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type={showPw ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#c9a227] focus:ring-2 focus:ring-[#c9a227]/20 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw(!showPw)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </div>
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">パスワード</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                     required placeholder="••••••••" className="input-dark" />
             </div>
-
-            {error && (
-              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 font-sans">{error}</p>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 bg-[#c9a227] text-white text-sm font-medium rounded-lg hover:bg-[#a8841f] active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-            >
-              {loading ? '認証中...' : 'ログイン'}
+            <button type="submit" disabled={loading} className="btn-gold w-full mt-2 py-3 text-base">
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ログイン中...
+                </span>
+              ) : 'ログイン'}
             </button>
           </form>
 
-          <div className="mt-8 p-4 bg-white border border-gray-100 rounded-xl">
-            <p className="text-xs font-medium text-gray-500 mb-2 font-sans">デモアカウント</p>
-            <div className="space-y-1">
-              <p className="text-xs text-gray-600 font-sans">管理者: <span className="font-medium text-[#0f1a33]">admin@example.com</span> / admin123</p>
-            </div>
+          <div className="mt-6 pt-5 border-t border-white/5">
+            <p className="text-xs text-slate-600 text-center mb-2">デモアカウント</p>
+            <p className="text-xs text-slate-500 text-center">
+              管理者: <span className="text-slate-300">admin@example.com</span> / admin123
+            </p>
+            <p className="text-xs text-slate-600 text-center mt-3">
+              このシステムはシミュレーション専用です。実際の金銭は一切関与しません。
+            </p>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

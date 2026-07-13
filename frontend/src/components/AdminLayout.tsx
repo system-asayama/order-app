@@ -1,83 +1,65 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Users, ClipboardList, BookOpen, LogOut, ShieldCheck } from 'lucide-react'
-import { useAuth } from '../hooks/useAuth'
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
 const navItems = [
-  { to: '/admin', icon: LayoutDashboard, label: 'Overview' },
-  { to: '/admin/users', icon: Users, label: 'ユーザー管理' },
-  { to: '/admin/order-items', icon: BookOpen, label: '品目マスター' },
-  { to: '/admin/orders', icon: ClipboardList, label: '注文管理' },
-]
+  { to: '/admin', icon: '📊', label: 'ダッシュボード', exact: true },
+  { to: '/admin/matches', icon: '⚽', label: '試合管理' },
+  { to: '/admin/bets', icon: '🎯', label: 'ベット一覧' },
+  { to: '/admin/sports', icon: '🏅', label: 'スポーツ管理' },
+  { to: '/admin/users', icon: '👥', label: 'ユーザー管理' },
+  { to: '/ranking', icon: '🏆', label: 'ランキング' },
+];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { pathname } = useLocation()
-  const navigate = useNavigate()
-  const { user } = useAuth()
-
-  const logout = () => {
-    localStorage.removeItem('token')
-    navigate('/login')
-  }
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
-    <div className="flex min-h-screen bg-[#faf8f3]">
-      {/* Sidebar */}
-      <aside className="w-60 bg-[#080e1f] flex flex-col shrink-0">
-        {/* Logo */}
-        <div className="px-6 py-6 border-b border-white/10">
-          <div className="flex items-center gap-2 mb-1">
-            <ShieldCheck size={16} className="text-[#c9a227]" />
-            <h1 className="font-serif text-xl text-[#c9a227] tracking-widest uppercase">Admin</h1>
-          </div>
-          <p className="text-xs text-white/40 font-sans">Order Management System</p>
+    <div className="flex min-h-screen" style={{ background: '#0a0e1a' }}>
+      <aside className="w-60 flex-shrink-0 flex flex-col"
+             style={{ background: '#111827', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="px-5 py-6 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+          <button onClick={() => navigate('/admin')} className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm"
+                 style={{ background: 'linear-gradient(135deg, #f0b429, #d97706)' }}>⚽</div>
+            <div>
+              <span className="font-bold text-sm tracking-wider block"
+                    style={{ fontFamily: 'Rajdhani, sans-serif', color: '#f0b429' }}>
+                SPORT BET SIM
+              </span>
+              <span className="text-xs text-slate-500">管理者パネル</span>
+            </div>
+          </button>
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-0.5">
-          {navItems.map(({ to, icon: Icon, label }) => {
-            const active = pathname === to
-            return (
-              <Link
-                key={to}
-                to={to}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-sans transition-all duration-150 ${
-                  active
-                    ? 'bg-[#c9a227]/20 text-[#e8c060]'
-                    : 'text-white/60 hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                <Icon size={16} strokeWidth={active ? 2 : 1.5} />
-                {label}
-              </Link>
-            )
-          })}
+          {navItems.map(item => (
+            <NavLink key={item.to} to={item.to} end={item.exact}
+              className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+              <span className="text-base">{item.icon}</span>
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
         </nav>
 
-        {/* User info */}
-        <div className="px-4 py-4 border-t border-white/10">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-full bg-[#c9a227]/20 flex items-center justify-center">
-              <ShieldCheck size={14} className="text-[#c9a227]" />
-            </div>
+        <div className="px-3 pb-4 border-t pt-3" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+          <div className="px-3 py-2 rounded-lg flex items-center justify-between"
+               style={{ background: 'rgba(255,255,255,0.03)' }}>
             <div className="min-w-0">
-              <p className="text-xs font-medium text-white truncate">{user?.name}</p>
-              <p className="text-xs text-white/40 truncate">Administrator</p>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="badge text-xs" style={{ background: 'rgba(240,180,41,0.15)', color: '#f0b429' }}>管理者</span>
+              </div>
+              <p className="text-xs font-medium text-slate-300 truncate">{user?.name}</p>
             </div>
+            <button onClick={logout}
+                    className="text-xs text-slate-500 hover:text-red-400 transition-colors px-2 py-1 rounded ml-2 flex-shrink-0">
+              ログアウト
+            </button>
           </div>
-          <button
-            onClick={logout}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/50 hover:text-white hover:bg-white/5 rounded-lg transition-all duration-150"
-          >
-            <LogOut size={13} />
-            ログアウト
-          </button>
         </div>
       </aside>
 
-      {/* Main */}
-      <main className="flex-1 overflow-auto">
-        {children}
-      </main>
+      <main className="flex-1 overflow-auto">{children}</main>
     </div>
-  )
+  );
 }

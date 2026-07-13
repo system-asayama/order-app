@@ -1,202 +1,151 @@
-import { useEffect, useState } from 'react'
-import { Plus, ChevronDown } from 'lucide-react'
-import { listUsers, createUser, updateUser, type User, type Role } from '../lib/api'
-import AdminLayout from '../components/AdminLayout'
-import { useAuth } from '../hooks/useAuth'
+import { useEffect, useState } from 'react';
+import AdminLayout from '../components/AdminLayout';
+import { api, type User } from '../lib/api';
 
 export default function AdminUsers() {
-  const { user: me } = useAuth()
-  const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ email: '', name: '', password: '', role: 'user' as Role })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [updating, setUpdating] = useState<number | null>(null)
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState({ email: '', name: '', password: '', role: 'user', initial_balance: '10000' });
+  const [balanceModal, setBalanceModal] = useState<User | null>(null);
+  const [balanceAmount, setBalanceAmount] = useState('');
+  const [balanceReason, setBalanceReason] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const load = () => {
-    setLoading(true)
-    listUsers().then(({ data }) => setUsers(data)).finally(() => setLoading(false))
-  }
+    api.get<User[]>('/users').then(r => setUsers(r.data)).catch(console.error).finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
 
-  useEffect(() => { load() }, [])
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!form.email || !form.name || !form.password) { setError('全項目を入力してください'); return }
-    setSaving(true)
+  const handleCreate = async () => {
+    if (!createForm.email || !createForm.name || !createForm.password) { setError('メール・名前・パスワードは必須です'); return; }
+    setSaving(true); setError('');
     try {
-      await createUser(form)
-      setShowForm(false)
-      setForm({ email: '', name: '', password: '', role: 'user' })
-      setError('')
-      load()
-    } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setError(detail || 'ユーザーの作成に失敗しました')
-    } finally {
-      setSaving(false)
-    }
-  }
+      await api.post('/users', { email: createForm.email, name: createForm.name, password: createForm.password, role: createForm.role, initial_balance: parseInt(createForm.initial_balance) || 10000 });
+      setCreateForm({ email: '', name: '', password: '', role: 'user', initial_balance: '10000' });
+      setShowCreate(false); load();
+    } catch (e: unknown) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'ユーザー作成に失敗しました');
+    } finally { setSaving(false); }
+  };
 
-  const handleRoleChange = async (id: number, role: Role) => {
-    setUpdating(id)
-    try {
-      await updateUser(id, { role })
-      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role } : u)))
-    } finally {
-      setUpdating(null)
-    }
-  }
+  const handleRoleChange = async (userId: number, role: string) => {
+    try { await api.put(`/users/${userId}`, { role }); load(); } catch (e) { console.error(e); }
+  };
 
-  const handleToggleActive = async (user: User) => {
-    setUpdating(user.id)
+  const handleToggleActive = async (userId: number, isActive: boolean) => {
+    try { await api.put(`/users/${userId}`, { is_active: !isActive }); load(); } catch (e) { console.error(e); }
+  };
+
+  const handleBalanceAdjust = async () => {
+    if (!balanceModal) return;
+    const amt = parseInt(balanceAmount);
+    if (isNaN(amt)) { setError('金額を入力してください'); return; }
+    setSaving(true); setError('');
     try {
-      await updateUser(user.id, { is_active: !user.is_active })
-      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, is_active: !user.is_active } : u)))
-    } finally {
-      setUpdating(null)
-    }
-  }
+      await api.post(`/users/${balanceModal.id}/adjust-balance`, { amount: amt, reason: balanceReason || '管理者による調整' });
+      setBalanceModal(null); setBalanceAmount(''); setBalanceReason(''); load();
+    } catch (e: unknown) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '残高調整に失敗しました');
+    } finally { setSaving(false); }
+  };
 
   return (
     <AdminLayout>
-      <div className="p-8">
-        <div className="flex items-center justify-between mb-8">
+      <div className="p-6 max-w-5xl mx-auto animate-fade-in">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-xs text-[#c9a227] uppercase tracking-widest font-sans mb-1">User Management</p>
-            <h2 className="font-serif text-3xl text-[#0f1a33]">ユーザー管理</h2>
-            <p className="text-sm text-gray-500 mt-1 font-sans">ユーザーの登録・ロール変更・有効/無効を管理します</p>
+            <h1 className="text-2xl font-bold text-white mb-1">ユーザー管理</h1>
+            <p className="text-slate-500 text-sm">ユーザーの作成・ロール・残高管理</p>
           </div>
-          <button
-            onClick={() => { setShowForm(!showForm); setError('') }}
-            className="flex items-center gap-2 px-4 py-2 bg-[#c9a227] text-white text-sm font-medium rounded-lg hover:bg-[#a8841f] active:scale-[0.98] transition-all duration-150"
-          >
-            <Plus size={15} />
-            ユーザーを追加
-          </button>
+          <button onClick={() => { setShowCreate(true); setError(''); }} className="btn-gold px-5 py-2.5 text-sm">＋ ユーザーを追加</button>
         </div>
 
-        {/* Create form */}
-        {showForm && (
-          <div className="card p-6 mb-6">
-            <h3 className="font-serif text-lg text-[#0f1a33] mb-4">新しいユーザーを追加</h3>
-            <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5 font-sans">メールアドレス <span className="text-red-500">*</span></label>
-                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  placeholder="user@example.com"
-                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#c9a227] focus:ring-2 focus:ring-[#c9a227]/20 transition-all font-sans" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5 font-sans">名前 <span className="text-red-500">*</span></label>
-                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="山田 太郎"
-                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#c9a227] focus:ring-2 focus:ring-[#c9a227]/20 transition-all font-sans" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5 font-sans">パスワード <span className="text-red-500">*</span></label>
-                <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  placeholder="6文字以上"
-                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#c9a227] focus:ring-2 focus:ring-[#c9a227]/20 transition-all font-sans" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5 font-sans">ロール</label>
-                <div className="relative">
-                  <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
-                    className="w-full appearance-none pl-4 pr-10 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#c9a227] focus:ring-2 focus:ring-[#c9a227]/20 transition-all font-sans">
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
-              {error && (
-                <div className="md:col-span-2">
-                  <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 font-sans">{error}</p>
-                </div>
-              )}
-              <div className="md:col-span-2 flex gap-3">
-                <button type="submit" disabled={saving}
-                  className="px-5 py-2 bg-[#c9a227] text-white text-sm font-medium rounded-lg hover:bg-[#a8841f] transition-all disabled:opacity-50">
-                  {saving ? '作成中...' : 'ユーザーを作成'}
-                </button>
-                <button type="button" onClick={() => setShowForm(false)}
-                  className="px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-100 transition-all font-sans">
-                  キャンセル
-                </button>
-              </div>
-            </form>
+        {showCreate && (
+          <div className="rounded-xl p-5 mb-6 animate-fade-in" style={{ background: '#111827', border: '1px solid rgba(240,180,41,0.2)' }}>
+            <h3 className="text-sm font-semibold text-white mb-4">新しいユーザーを追加</h3>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div><label className="block text-xs text-slate-400 mb-1.5">メールアドレス *</label><input value={createForm.email} onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))} placeholder="user@example.com" className="input-dark" /></div>
+              <div><label className="block text-xs text-slate-400 mb-1.5">名前 *</label><input value={createForm.name} onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))} placeholder="山田 太郎" className="input-dark" /></div>
+              <div><label className="block text-xs text-slate-400 mb-1.5">パスワード *</label><input type="password" value={createForm.password} onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))} placeholder="••••••••" className="input-dark" /></div>
+              <div><label className="block text-xs text-slate-400 mb-1.5">初期ポイント</label><input type="number" value={createForm.initial_balance} onChange={e => setCreateForm(f => ({ ...f, initial_balance: e.target.value }))} className="input-dark" /></div>
+              <div><label className="block text-xs text-slate-400 mb-1.5">ロール</label><select value={createForm.role} onChange={e => setCreateForm(f => ({ ...f, role: e.target.value }))} className="input-dark"><option value="user">ユーザー</option><option value="admin">管理者</option></select></div>
+            </div>
+            {error && <div className="mb-3 px-3 py-2 rounded-lg text-sm text-red-300" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>{error}</div>}
+            <div className="flex gap-3">
+              <button onClick={() => setShowCreate(false)} className="flex-1 py-2 text-sm rounded-lg font-semibold" style={{ background: 'rgba(255,255,255,0.06)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.08)' }}>キャンセル</button>
+              <button onClick={handleCreate} disabled={saving} className="flex-1 btn-gold py-2 text-sm">{saving ? '作成中...' : '作成'}</button>
+            </div>
           </div>
         )}
 
-        {/* Table */}
-        <div className="card">
-          {loading ? (
-            <div className="p-8 text-center text-sm text-gray-400 font-sans">読み込み中...</div>
-          ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 font-sans">名前</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 font-sans">メール</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 font-sans">ロール</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 font-sans">状態</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 font-sans">登録日</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4 text-sm font-medium text-[#0f1a33] font-sans">{u.name}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500 font-sans">{u.email}</td>
-                    <td className="px-6 py-4">
-                      {u.id === me?.id ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#c9a227]/10 text-[#c9a227] border border-[#c9a227]/30">
-                          {u.role === 'admin' ? 'Admin' : 'User'}
-                        </span>
-                      ) : (
-                        <div className="relative inline-block">
-                          <select
-                            value={u.role}
-                            onChange={(e) => handleRoleChange(u.id, e.target.value as Role)}
-                            disabled={updating === u.id}
-                            className="appearance-none pl-3 pr-7 py-1 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-[#c9a227] transition-all font-sans disabled:opacity-50"
-                          >
-                            <option value="user">User</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                          <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        <div className="rounded-xl overflow-hidden" style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="px-5 py-4 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+            <h2 className="font-semibold text-white text-sm">ユーザー一覧 ({users.length}人)</h2>
+          </div>
+          {loading ? <div className="p-12 text-center text-slate-600">読み込み中...</div>
+           : users.length === 0 ? <div className="p-12 text-center text-slate-600">ユーザーがいません</div>
+           : (
+            <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+              {users.map(user => (
+                <div key={user.id} className="px-5 py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: 'rgba(240,180,41,0.1)', color: '#f0b429', border: '1px solid rgba(240,180,41,0.2)' }}>
+                        {user.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-white">{user.name}</p>
+                          <span className={`badge text-xs ${user.role === 'admin' ? 'text-yellow-400 bg-yellow-400/10 border border-yellow-400/20' : 'text-slate-400 bg-slate-400/10 border border-slate-400/20'}`}>{user.role === 'admin' ? '管理者' : 'ユーザー'}</span>
+                          {!user.is_active && <span className="badge text-xs text-red-400 bg-red-400/10 border border-red-400/20">無効</span>}
                         </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      {u.id === me?.id ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">有効</span>
-                      ) : (
-                        <button
-                          onClick={() => handleToggleActive(u)}
-                          disabled={updating === u.id}
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all ${
-                            u.is_active
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                              : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
-                          }`}
-                        >
-                          {u.is_active ? '有効' : '無効'}
-                        </button>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-xs text-gray-400 font-sans">
-                      {new Date(u.created_at).toLocaleDateString('ja-JP')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        <p className="text-xs text-slate-500">{user.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <p className="text-sm font-bold" style={{ color: '#f0b429', fontFamily: 'Rajdhani, sans-serif' }}>{user.balance.toLocaleString()} pt</p>
+                      <button onClick={() => { setBalanceModal(user); setBalanceAmount(''); setBalanceReason(''); setError(''); }} className="px-3 py-1.5 text-xs rounded-lg" style={{ background: 'rgba(240,180,41,0.1)', color: '#f0b429', border: '1px solid rgba(240,180,41,0.2)' }}>残高調整</button>
+                      <select value={user.role} onChange={e => handleRoleChange(user.id, e.target.value)} className="text-xs rounded-lg px-2 py-1.5" style={{ background: 'rgba(255,255,255,0.06)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <option value="user">ユーザー</option>
+                        <option value="admin">管理者</option>
+                      </select>
+                      <button onClick={() => handleToggleActive(user.id, user.is_active)} className="px-3 py-1.5 text-xs rounded-lg" style={user.is_active ? { background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' } : { background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}>
+                        {user.is_active ? '無効化' : '有効化'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
+
+      {balanceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}>
+          <div className="w-full max-w-sm rounded-2xl p-6 animate-fade-in" style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-white">残高調整</h3>
+              <button onClick={() => setBalanceModal(null)} className="text-slate-500 hover:text-white text-xl">×</button>
+            </div>
+            <div className="rounded-xl p-3 mb-4 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <p className="text-sm font-semibold text-white">{balanceModal.name}</p>
+              <p className="text-xs text-slate-500">現在: {balanceModal.balance.toLocaleString()} pt</p>
+            </div>
+            <div className="space-y-3 mb-4">
+              <div><label className="block text-xs text-slate-400 mb-1.5">調整額（+で付与、-で減算）</label><input type="number" value={balanceAmount} onChange={e => setBalanceAmount(e.target.value)} placeholder="例: 5000 または -1000" className="input-dark" /></div>
+              <div><label className="block text-xs text-slate-400 mb-1.5">理由（任意）</label><input value={balanceReason} onChange={e => setBalanceReason(e.target.value)} placeholder="例: 初期付与、ボーナス" className="input-dark" /></div>
+            </div>
+            {error && <div className="mb-4 px-3 py-2 rounded-lg text-sm text-red-300" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>{error}</div>}
+            <div className="flex gap-3">
+              <button onClick={() => setBalanceModal(null)} className="flex-1 py-2.5 text-sm rounded-lg font-semibold" style={{ background: 'rgba(255,255,255,0.06)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.08)' }}>キャンセル</button>
+              <button onClick={handleBalanceAdjust} disabled={saving} className="flex-1 btn-gold py-2.5 text-sm">{saving ? '処理中...' : '調整する'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
-  )
+  );
 }

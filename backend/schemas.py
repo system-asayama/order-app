@@ -1,12 +1,11 @@
 from datetime import datetime
-from typing import Optional
 from decimal import Decimal
+from typing import Optional, List
 from pydantic import BaseModel, EmailStr, field_validator
-from models import UserRole, OrderStatus
+from models import UserRole, MatchStatus, BetSide, BetResult, TransactionType
 
 
-# ---- Auth ----
-
+# ===== Auth =====
 class LoginRequest(BaseModel):
     email: str
     password: str
@@ -17,108 +16,149 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
-class UserResponse(BaseModel):
-    id: int
-    email: str
-    name: str
-    role: UserRole
-    is_active: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
+# ===== User =====
 class UserCreate(BaseModel):
     email: str
     name: str
     password: str
     role: UserRole = UserRole.user
-
-    @field_validator("password")
-    @classmethod
-    def password_min_length(cls, v: str) -> str:
-        if len(v) < 6:
-            raise ValueError("パスワードは6文字以上で入力してください")
-        return v
+    balance: Decimal = Decimal("1000.00")
 
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     role: Optional[UserRole] = None
+    balance: Optional[Decimal] = None
     is_active: Optional[bool] = None
 
 
-# ---- Order Item Master ----
-
-class OrderItemCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
-    default_amount: Optional[Decimal] = None
-    category: Optional[str] = None
-
-
-class OrderItemUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    default_amount: Optional[Decimal] = None
-    category: Optional[str] = None
-    is_active: Optional[bool] = None
-
-
-class OrderItemResponse(BaseModel):
+class UserResponse(BaseModel):
     id: int
+    email: str
     name: str
-    description: Optional[str]
-    default_amount: Optional[Decimal]
-    category: Optional[str]
+    role: UserRole
+    balance: Decimal
     is_active: bool
     created_at: datetime
-    updated_at: datetime
 
     class Config:
         from_attributes = True
 
 
-# ---- Orders ----
+# ===== Sport =====
+class SportCreate(BaseModel):
+    name: str
+    icon: str = "🏆"
 
-class OrderCreate(BaseModel):
-    order_item_id: Optional[int] = None
-    item_name: str
+
+class SportResponse(BaseModel):
+    id: int
+    name: str
+    icon: str
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+# ===== Match =====
+class MatchCreate(BaseModel):
+    sport_id: int
+    home_team: str
+    away_team: str
+    match_date: datetime
+    handicap: Decimal = Decimal("0.00")
+    notes: Optional[str] = None
+
+
+class MatchUpdate(BaseModel):
+    home_team: Optional[str] = None
+    away_team: Optional[str] = None
+    match_date: Optional[datetime] = None
+    handicap: Optional[Decimal] = None
+    status: Optional[MatchStatus] = None
+    notes: Optional[str] = None
+
+
+class MatchResultInput(BaseModel):
+    home_score: int
+    away_score: int
+
+
+class MatchResponse(BaseModel):
+    id: int
+    sport_id: int
+    sport: Optional[SportResponse] = None
+    home_team: str
+    away_team: str
+    match_date: datetime
+    handicap: Decimal
+    home_score: Optional[int] = None
+    away_score: Optional[int] = None
+    status: MatchStatus
+    notes: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ===== Bet =====
+class BetCreate(BaseModel):
+    match_id: int
+    side: BetSide
     amount: Decimal
-    memo: Optional[str] = None
 
     @field_validator("amount")
     @classmethod
-    def amount_positive(cls, v: Decimal) -> Decimal:
+    def amount_must_be_positive(cls, v):
         if v <= 0:
-            raise ValueError("金額は0より大きい値を入力してください")
+            raise ValueError("賭けポイントは1以上である必要があります")
         return v
 
-    @field_validator("item_name")
-    @classmethod
-    def item_name_not_empty(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("品目名を入力してください")
-        return v.strip()
 
-
-class OrderStatusUpdate(BaseModel):
-    status: OrderStatus
-
-
-class OrderResponse(BaseModel):
+class BetResponse(BaseModel):
     id: int
     user_id: int
-    order_item_id: Optional[int]
-    item_name: str
+    match_id: int
+    match: Optional[MatchResponse] = None
+    side: BetSide
     amount: Decimal
-    memo: Optional[str]
-    status: OrderStatus
+    result: BetResult
+    result_label: Optional[str] = None  # "X歩負け"・"勝ち"等の表示用ラベル
+    payout: Optional[Decimal] = None
     created_at: datetime
-    updated_at: datetime
-    user_name: Optional[str] = None
-    user_email: Optional[str] = None
+    settled_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+
+# ===== PointTransaction =====
+class PointTransactionResponse(BaseModel):
+    id: int
+    amount: Decimal
+    balance_after: Decimal
+    transaction_type: TransactionType
+    description: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ===== Admin: Balance Adjust =====
+class BalanceAdjust(BaseModel):
+    amount: Decimal
+    description: Optional[str] = None
+
+
+# ===== Ranking =====
+class RankingEntry(BaseModel):
+    rank: int
+    user_id: int
+    name: str
+    balance: Decimal
+    total_bets: int
+    wins: int
+    win_rate: float
