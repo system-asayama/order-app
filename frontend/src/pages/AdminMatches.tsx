@@ -332,7 +332,7 @@ export default function AdminMatches() {
                   </button>
                 </div>
                 <p className="text-xs text-slate-600 mt-1.5">
-                  選択したチームが -{form.handicap || '0'} のハンデを背負います
+                  選択したチームに {form.handicap || '0'} 点のハンデが付きます（そのチームが不利になります）
                 </p>
               </div>
 
